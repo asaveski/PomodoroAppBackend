@@ -1,0 +1,10 @@
+# Ignore appsettings.json to avoid exposing secrets
+appsettings.json
+
+# Common ASP.NET Core files to ignore
+bin/
+obj/
+.vs/
+*.user
+*.db
+*.log

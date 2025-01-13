@@ -1,0 +1,6 @@
+@PomodoroAppBackend_HostAddress = http://localhost:5089
+
+GET {{PomodoroAppBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
