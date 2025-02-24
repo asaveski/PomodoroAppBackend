@@ -21,10 +21,7 @@ builder.Services.AddDbContext<ApplicationDBContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Register HttpClient
-builder.Services.AddControllers().AddJsonOptions(options =>
-{
-    options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve; // Handle circular references
-});
+builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 
 // Add session services

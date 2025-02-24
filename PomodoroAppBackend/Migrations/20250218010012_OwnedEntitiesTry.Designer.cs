@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using PomodoroAppBackend.Context;
 
@@ -10,9 +11,11 @@ using PomodoroAppBackend.Context;
 namespace PomodoroAppBackend.Migrations
 {
     [DbContext(typeof(ApplicationDBContext))]
-    partial class ApplicationDBContextModelSnapshot : ModelSnapshot
+    [Migration("20250218010012_OwnedEntitiesTry")]
+    partial class OwnedEntitiesTry
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -90,59 +93,6 @@ namespace PomodoroAppBackend.Migrations
                                 .HasForeignKey("NoteId");
                         });
 
-                    b.OwnsMany("PomodoroAppBackend.Models.Quiz", "Quizzes", b1 =>
-                        {
-                            b1.Property<int>("QuizId")
-                                .ValueGeneratedOnAdd()
-                                .HasColumnType("int");
-
-                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<int>("QuizId"));
-
-                            b1.Property<int>("NoteId")
-                                .HasColumnType("int");
-
-                            b1.HasKey("QuizId");
-
-                            b1.HasIndex("NoteId");
-
-                            b1.ToTable("Quiz");
-
-                            b1.WithOwner()
-                                .HasForeignKey("NoteId");
-
-                            b1.OwnsMany("PomodoroAppBackend.Models.Question", "Questions", b2 =>
-                                {
-                                    b2.Property<int>("QuestionId")
-                                        .ValueGeneratedOnAdd()
-                                        .HasColumnType("int");
-
-                                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b2.Property<int>("QuestionId"));
-
-                                    b2.Property<string>("CorrectAnswer")
-                                        .HasColumnType("nvarchar(max)");
-
-                                    b2.PrimitiveCollection<string>("Options")
-                                        .HasColumnType("nvarchar(max)");
-
-                                    b2.Property<string>("QuestionText")
-                                        .HasColumnType("nvarchar(max)");
-
-                                    b2.Property<int>("QuizId")
-                                        .HasColumnType("int");
-
-                                    b2.HasKey("QuestionId");
-
-                                    b2.HasIndex("QuizId");
-
-                                    b2.ToTable("Questions");
-
-                                    b2.WithOwner()
-                                        .HasForeignKey("QuizId");
-                                });
-
-                            b1.Navigation("Questions");
-                        });
-
                     b.OwnsMany("PomodoroAppBackend.Models.SuccinctNote", "SuccinctNotes", b1 =>
                         {
                             b1.Property<int>("NoteId")
@@ -166,8 +116,6 @@ namespace PomodoroAppBackend.Migrations
                         });
 
                     b.Navigation("Cues");
-
-                    b.Navigation("Quizzes");
 
                     b.Navigation("Subject");
 

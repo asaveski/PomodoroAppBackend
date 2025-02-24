@@ -4,6 +4,8 @@
     {
         public int SubjectId { get; set; }
         public string? Name { get; set; }  // E.g., "Math", "Physics"
-        public List<Note>? Notes { get; set; }  // A subject will have many notes
+
+        // No need for Notes property in the Subject class
+        // The relationship is handled by the Note class
     }
 }
