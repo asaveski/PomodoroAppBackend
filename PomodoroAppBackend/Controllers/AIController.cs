@@ -130,19 +130,52 @@ namespace PomodoroAppBackend.Controllers
             return Ok(new { response = jsonResponse.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() });
         }
 
-        [HttpPost("save-note")]
-        public async Task<IActionResult> SaveNote([FromBody] Note newNote)
+        [HttpPost("save-note2")] //This is with subject generation 
+        public async Task<IActionResult> SaveNote2([FromBody] NoteDto newNote)
         {
+            Console.WriteLine("Received Note: " + JsonSerializer.Serialize(newNote));
             if (string.IsNullOrWhiteSpace(newNote.Topic) || newNote.Cues == null || newNote.SuccinctNotes == null)
             {
-                return BadRequest("Please provide valid data for the note.");
+                var errorMessage = new StringBuilder("Please provide valid data for the note. ");
+
+                if (string.IsNullOrWhiteSpace(newNote.Topic))
+                {
+                    errorMessage.Append($"Topic is invalid: '{newNote.Topic}'. ");
+                }
+
+                if (newNote.Cues == null)
+                {
+                    errorMessage.Append("Cues are null. ");
+                }
+
+                if (newNote.SuccinctNotes == null)
+                {
+                    errorMessage.Append("SuccinctNotes are null. ");
+                }
+
+                return BadRequest(errorMessage.ToString());
             }
 
-            // Validate that Subject exists
+            // Check if a valid SubjectId is provided
             var subject = await _context.Subjects.FindAsync(newNote.SubjectId);
+
             if (subject == null)
             {
-                return BadRequest("Subject not found.");
+                // If subject is not found, check if SubjectName is provided
+                if (string.IsNullOrWhiteSpace(newNote.SubjectName))
+                {
+                    return BadRequest("Subject not found and no subject name provided.");
+                }
+
+                // Check if a subject with the same name already exists
+                subject = await _context.Subjects.FirstOrDefaultAsync(s => s.Name == newNote.SubjectName);
+                if (subject == null)
+                {
+                    // Create a new Subject if not found
+                    subject = new Subject { Name = newNote.SubjectName };
+                    _context.Subjects.Add(subject);
+                    await _context.SaveChangesAsync();  // Save the new subject to get its ID
+                }
             }
 
             // Create the new Note
@@ -150,18 +183,76 @@ namespace PomodoroAppBackend.Controllers
             {
                 Topic = newNote.Topic,
                 Summary = newNote.Summary,
-                Subject = subject,  // Link the Note to the Subject
-                Cues = newNote.Cues.Select(cue => new Cue { Text = cue.Text }).ToList(),
-                SuccinctNotes = newNote.SuccinctNotes.Select(succNote => new SuccinctNote { Summary = succNote.Summary }).ToList()
+                SubjectId = subject.SubjectId,  // Associate the subject
+                Subject = subject,  // Optionally link the full subject object
+                Cues = newNote.Cues.Select(cue => new Cue { Text = cue }).ToList(),
+                SuccinctNotes = newNote.SuccinctNotes.Select(succNote => new SuccinctNote { Summary = succNote }).ToList()
             };
 
-            // Add the new Note to the context and save
+            // Add the new Note to the context and save it
             _context.Notes.Add(note);
             await _context.SaveChangesAsync();
 
             // Return the created note or a message confirming successful creation
             return CreatedAtAction(nameof(GetNoteById), new { id = note.NoteId }, note); // Assuming a GetNoteById action exists
         }
+
+        [HttpPut("update-note/{id}")]
+        public async Task<IActionResult> UpdateNote(int id, [FromBody] NoteDto updatedNote)
+        {
+
+            // Log the incoming request body
+            Console.WriteLine("Received UpdateNote request: " + JsonSerializer.Serialize(updatedNote));
+
+            var note = await _context.Notes
+                .Include(n => n.Cues)
+                .Include(n => n.SuccinctNotes)
+                .FirstOrDefaultAsync(n => n.NoteId == id);
+
+            if (note == null)
+            {
+                return NotFound("Note not found.");
+            }
+
+            if (string.IsNullOrWhiteSpace(updatedNote.Topic) || updatedNote.Cues == null || updatedNote.SuccinctNotes == null)
+            {
+                return BadRequest("Please provide valid data for the note.");
+            }
+
+            // Update the note properties
+            note.Topic = updatedNote.Topic;
+            note.Summary = updatedNote.Summary;
+
+            // Update the Cues
+            note.Cues.Clear();
+            note.Cues.AddRange(updatedNote.Cues.Select(cue => new Cue { Text = cue }));
+
+            // Update the SuccinctNotes
+            note.SuccinctNotes.Clear();
+            note.SuccinctNotes.AddRange(updatedNote.SuccinctNotes.Select(succNote => new SuccinctNote { Summary = succNote }));
+
+            // Save changes to the database
+            await _context.SaveChangesAsync(); //TODO: Edit is buggy here maybe
+
+            return Ok(note);
+        }
+
+        [HttpDelete("delete-note/{id}")]
+        public async Task<IActionResult> DeleteNote(int id)
+        {
+            var note = await _context.Notes.FindAsync(id);
+
+            if (note == null)
+            {
+                return NotFound("Note not found.");
+            }
+
+            _context.Notes.Remove(note);
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Note deleted successfully." });
+        }
+
 
         [HttpGet("get-notes")]
         public async Task<IActionResult> GetNotes()
@@ -192,16 +283,84 @@ namespace PomodoroAppBackend.Controllers
             return Ok(note);
         }
 
-        [HttpPost("generate-note")]
-        public async Task<IActionResult> GenerateNote([FromBody] string inputText)
+        //[HttpGet("get-all-subjects")]
+        //public async Task<IActionResult> GetAllSubjects()
+        //{
+        //    // Query the database for all subjects
+        //    var subjects = await _context.Subjects
+        //        .Include(s => s.Notes) // Optionally include related Notes
+        //        .ToListAsync();
+
+        //    // Check if any subjects were found
+        //    if (subjects == null || subjects.Count == 0)
+        //    {
+        //        return NotFound("No subjects found.");
+        //    }
+
+        //    // Return the list of subjects
+        //    return Ok(subjects);
+        //}
+
+        [HttpGet("get-notes-by-subject/{subjectId}")]
+        public async Task<IActionResult> GetNotesBySubjectId(int subjectId)
         {
-            if (string.IsNullOrWhiteSpace(inputText))
+            // Query the database for notes with the specified subject ID
+            var notes = await _context.Notes
+                .Include(n => n.Subject) // Include the related Subject
+                .Include(n => n.Cues) // Include the related Cues
+                .Include(n => n.SuccinctNotes) // Include the related Succinct Notes
+                .Where(n => n.SubjectId == subjectId)
+                .ToListAsync();
+
+            // Check if any notes were found
+            if (notes == null || notes.Count == 0)
+            {
+                return NotFound("No notes found for the specified subject ID.");
+            }
+
+            // Return the list of notes
+            return Ok(notes);
+        }
+
+        [HttpDelete("delete-subject/{subjectId}")]
+        public async Task<IActionResult> DeleteSubject(int subjectId)
+        {
+            // Retrieve the subject
+            var subject = await _context.Subjects.FindAsync(subjectId);
+
+            if (subject == null)
+            {
+                return NotFound("Subject not found.");
+            }
+
+            // Retrieve the notes associated with the subject
+            var notes = await _context.Notes
+                .Where(n => n.SubjectId == subjectId)
+                .ToListAsync();
+
+            // Remove the notes
+            _context.Notes.RemoveRange(notes);
+
+            // Remove the subject
+            _context.Subjects.Remove(subject);
+
+            // Save changes to the database
+            await _context.SaveChangesAsync();
+
+            return Ok(new { message = "Subject and its notes deleted successfully." });
+        }
+
+
+        [HttpPost("generate-note")]
+        public async Task<IActionResult> GenerateNote([FromBody] GenerateNoteRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.InputText))
             {
                 return BadRequest("Input text cannot be empty.");
             }
 
             // Escape newlines and other special characters
-            var escapedNoteText = inputText.Replace("\n", "\\n").Replace("\r", "\\r");
+            var escapedNoteText = request.InputText.Replace("\n", "\\n").Replace("\r", "\\r");
 
             var apiKey = _configuration["OpenAI:ApiKey"];
             var requestBody = new
@@ -209,10 +368,10 @@ namespace PomodoroAppBackend.Controllers
                 model = "gpt-4o",
                 messages = new[]
                 {
-                    new { role = "system", content = "You are a helpful assistant for learning. When asked to generate a Cornell note, its crucial to return a note in a JSON format, dont write anything outside of the Json format, DO NOT WRAP THE JSON CODES IN JSON MARKERS, so I can extract data to objects easily, follow this {\r\n  \"topic\": \"{Topic}\",\r\n  \"summary\": \"{Summary}\",\r\n  \"cues\": [\"{Cue1}\", \"{Cue2}\", \"{Cue3}\", ...],\r\n  \"succinctNotes\": [\"{SuccinctNote1}\", \"{SuccinctNote2}\", \"{SuccinctNote3}\", ...]\r\n}" },
-                    new { role = "user", content = $"Generate a Cornell note from the following text: {escapedNoteText}. Use JSON for the response. The summary should keep most of the entry text, don't shorten it much." }
-                },
-                max_tokens = 250
+            new { role = "system", content = "You are a helpful assistant for learning. When asked to generate a Cornell note, its crucial to return a note in a JSON format, dont write anything outside of the Json format, DO NOT WRAP THE JSON CODES IN JSON MARKERS, so I can extract data to objects easily, follow this {\r\n  \"topic\": \"{Topic}\",\r\n  \"summary\": \"{Summary}\",\r\n  \"cues\": [\"{Cue1}\", \"{Cue2}\", \"{Cue3}\", ...],\r\n  \"succinctNotes\": [\"{SuccinctNote1}\", \"{SuccinctNote2}\", \"{SuccinctNote3}\", ...]\r\n}" },
+            new { role = "user", content = $"Generate a Cornell note from the following text: {escapedNoteText}. Use JSON for the response. The summary should keep most of the entry text, don't shorten it much." }
+        },
+                max_tokens = 600
             };
 
             var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
@@ -291,7 +450,8 @@ namespace PomodoroAppBackend.Controllers
             return Ok(newNote);
         }
 
-        [HttpPost("generate-quiz1")]
+
+        [HttpPost("test-generate-quiz")]
         public async Task<IActionResult> GenerateQuiz1([FromBody] GenerateQuizRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.NoteText))
@@ -338,7 +498,7 @@ namespace PomodoroAppBackend.Controllers
 
             return Ok(new { response = quiz });
         }
-        [HttpPost("generate-quiz2")]
+        [HttpPost("generate-quiz")]
         public async Task<IActionResult> GenerateQuiz2([FromBody] GenerateQuizRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.NoteText))
