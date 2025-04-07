@@ -10,11 +10,16 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp", builder =>
     {
         builder.WithOrigins("http://localhost:5173", "http://localhost:5173") // React frontend's URL
-               .AllowAnyMethod() // Allow any HTTP method (GET, POST, PUT, DELETE, etc.)
-               .AllowAnyHeader()
-               .SetIsOriginAllowed(origin => true)
-               .AllowCredentials(); // For using cookies or session
+            .AllowAnyMethod() // Allow any HTTP method (GET, POST, PUT, DELETE, etc.)
+            .AllowAnyHeader()
+            .SetIsOriginAllowed(origin => true)
+            .AllowCredentials(); // For using cookies or session
     });
+});
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(8080);
 });
 
 builder.Services.AddDbContext<ApplicationDBContext>(options =>
@@ -57,5 +62,12 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
+    db.Database.Migrate();
+}
 
 app.Run();
