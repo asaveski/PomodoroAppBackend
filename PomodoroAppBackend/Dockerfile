@@ -7,8 +7,12 @@ WORKDIR /app
 # Copy the project files
 COPY . .
 
+RUN curl https://api.nuget.org/v3/index.json
+RUN apt-get update && apt-get install -y ca-certificates
+
 # Restore using the local nuget.config from the image
-RUN dotnet restore --disable-parallel || true
+RUN dotnet nuget list source && \
+    dotnet restore --disable-parallel --verbosity detailed
 
 # Build the project
 RUN dotnet build -c Release || dotnet build
