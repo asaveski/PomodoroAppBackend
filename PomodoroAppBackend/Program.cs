@@ -46,6 +46,30 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Check if we should only run migrations and then exit
+if (args.Contains("--migrate"))
+{
+    using (var scope = app.Services.CreateScope())
+    {
+        var services = scope.ServiceProvider;
+        try
+        {
+            var context = services.GetRequiredService<ApplicationDBContext>();
+            context.Database.Migrate();
+            Console.WriteLine("Database migration completed successfully.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"An error occurred while migrating the database: {ex.Message}");
+            // Exit with error code
+            Environment.Exit(1);
+        }
+    }
+    // Exit after migration
+    Environment.Exit(0);
+}
+
+// Continue with normal application startup
 app.UseCors("AllowReactApp");
 
 // Configure the HTTP request pipeline.
@@ -63,7 +87,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-
+// Always run migrations on application startup
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDBContext>();
