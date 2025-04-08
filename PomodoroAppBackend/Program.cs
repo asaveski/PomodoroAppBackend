@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PomodoroAppBackend.Context;
-using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,10 +17,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-builder.WebHost.ConfigureKestrel(options =>
-{
-    options.ListenAnyIP(8080);
-});
+builder.WebHost.ConfigureKestrel(options => { options.ListenAnyIP(8080); });
 
 builder.Services.AddDbContext<ApplicationDBContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
@@ -44,6 +41,7 @@ builder.Services.AddSession(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+
 var app = builder.Build();
 
 // Check if we should only run migrations and then exit
@@ -65,9 +63,17 @@ if (args.Contains("--migrate"))
             Environment.Exit(1);
         }
     }
+
     // Exit after migration
     Environment.Exit(0);
 }
+
+app.UseForwardedHeaders(new ForwardedHeadersOptions
+{
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+    ForwardLimit = null,
+    RequireHeaderSymmetry = false
+});
 
 // Continue with normal application startup
 app.UseCors("AllowReactApp");
@@ -81,7 +87,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSession();
 
-app.UseHttpsRedirection();
+// Commented as it is not needed when nginx handles https redirection
+// app.UseHttpsRedirection();
 
 app.UseAuthorization();
 
