@@ -8,6 +8,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - CONNECTION_STRING=Server=db;Database=${DB_NAME};User Id=${DB_USER};Password=${DB_PASSWORD};Encrypt=False;
+      - OPENAIAPIKEY=${OPENAIAPIKEY}
 
   db:
     image: mcr.microsoft.com/mssql/server:2022-latest
